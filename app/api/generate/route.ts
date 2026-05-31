@@ -25,11 +25,38 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Menggunakan model standar gemini-1.5-flash yang cepat dan hemat resource
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // Daftar model dari yang terbaru/terbaik ke yang paling kompatibel
+    const modelsToTry = [
+      "gemini-2.5-flash",
+      "gemini-2.0-flash",
+      "gemini-1.5-flash-latest",
+      "gemini-1.5-flash"
+    ];
 
-    // Memanggil API Gemini untuk generate konten
-    const result = await model.generateContent(prompt);
+    let result = null;
+    let lastError: any = null;
+
+    for (const modelName of modelsToTry) {
+      try {
+        console.log(`Mencoba memproses menggunakan model: ${modelName}...`);
+        const model = genAI.getGenerativeModel({ model: modelName });
+        result = await model.generateContent(prompt);
+        if (result && result.response) {
+          console.log(`Sukses menggunakan model: ${modelName}`);
+          break; // Berhasil, keluar dari loop
+        }
+      } catch (err: any) {
+        console.warn(`Model ${modelName} gagal atau tidak didukung:`, err.message || err);
+        lastError = err;
+      }
+    }
+
+    if (!result) {
+      throw new Error(
+        `Semua model Gemini yang dicoba gagal merespons. Error terakhir: ${lastError?.message || "Unknown error"}`
+      );
+    }
+
     const responseText = result.response.text();
 
     return NextResponse.json({
